@@ -14,6 +14,7 @@
 #include <sstream>
 #include <string>
 #include <iterator>
+#include <map>
 
 #include "particle_filter.h"
 
@@ -33,7 +34,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	normal_distribution<double> dist_y(y, std_y);
 	normal_distribution<double> dist_theta(theta, std_theta);
 
-	num_particles = 10;
+	num_particles = 100;
 	for (int i = 0; i < num_particles; i++) {
 		Particle p;
 		p.id = i;
@@ -124,27 +125,22 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		p.weight = 1.0;
 
-		vector<LandmarkObs> predicted;
+//		vector<LandmarkObs> predicted;
+		map<int, LandmarkObs> landmarksInRange;
 		for (const auto& landmark : map_landmarks.landmark_list) {
-//			if ((p.x-sensor_range <= landmark.x_f && landmark.x_f <= p.x+sensor_range) &&
-//					(p.y-sensor_range <= landmark.y_f && landmark.y_f<= p.y+sensor_range)) {
-			LandmarkObs pred;
-			pred.id = landmark.id_i;
-			pred.x = landmark.x_f;
-			pred.y = landmark.y_f;
-			predicted.push_back(pred);
-//			}
-
-//			double distance = dist(landmark.x_f, landmark.y_f, p.x, p.y);
-//			if (distance <= sensor_range) {
-//				LandmarkObs pred;
-//				pred.id = landmark.id_i;
-//				pred.x = landmark.x_f;
-//				pred.y = landmark.y_f;
+			if ((landmark.x_f >= p.x-sensor_range && landmark.x_f <= p.x+sensor_range) &&
+					(landmark.y_f >= p.y-sensor_range && landmark.y_f <= p.y+sensor_range)) {
+				LandmarkObs pred;
+				pred.id = landmark.id_i;
+				pred.x = landmark.x_f;
+				pred.y = landmark.y_f;
 //				predicted.push_back(pred);
-//			}
+				landmarksInRange[pred.id] = pred;
+//				landmarksInRange.insert(pair<int, LandmarkObs>(pred.id, pred));
+			}
 		}
 
+//		cout << "Transformations" << endl;
 		vector<LandmarkObs> obsMapList;
 		for (const auto& obs : observations) {
 			double glob_obs_x = obs.x*cos(p.theta) - obs.y*sin(p.theta) + p.x;
@@ -155,35 +151,44 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			obsMap.x = glob_obs_x;
 			obsMap.y = glob_obs_y;
 			obsMapList.push_back(obsMap);
+
+//			cout << "(" << obs.x << ", " << obs.y << ") --> (" << obsMap.x << ", " << obsMap.y << ")" << endl;
 		}
+//		cout << "-------------------------------------------------" << endl;
 
 //		dataAssociation(predicted, obsMapList);
+//		cout << "Associations" << endl;
 		for (auto& obs : obsMapList) {
 			double minDist = std::numeric_limits<float>::max();
-			for (const auto& pred : predicted) {
+//			for (const auto& pred : predicted) {
+//			map<int, LandmarkObs>::iterator it;
+			for (const auto &it: landmarksInRange) {
+				auto &pred = it.second;
 				double distance = dist(obs.x, obs.y, pred.x, pred.y);
-				if (minDist > distance) {
+				if (distance < minDist) {
 					minDist = distance;
 					obs.id = pred.id;
 				}
 			}
+//			it = landmarksInRange.find(obs.id);
+//			auto &p = it->second;
+//			cout << "Obs (" << obs.x << ", " << obs.y << ") --> Landmark (" << p.x << ", " <<
+//					p.y << "): " << obs.id << ", minDist: " << minDist << endl;
 		}
+//		cout << "-------------------------------------------------" << endl;
 
+//		cout << "Weight Calculations" << endl;
 		vector<int> associations;
 		vector<double> senseX;
 		vector<double> senseY;
 		for (const auto& obs : obsMapList) {
-			LandmarkObs& association = predicted[obs.id];
+
+//			LandmarkObs& association = predicted[obs.id-1];
+			LandmarkObs& association = landmarksInRange.find(obs.id)->second;
 			associations.push_back(association.id);
 			senseX.push_back(association.x);
 			senseY.push_back(association.y);
 
-//			double distance = dist(obs.x, obs.y, predicted[obs.id].x, predicted[obs.id].y);
-//			cout << "nearby landmark: " << obs.id << endl;
-//			cout << "obs (" << obs.x << ", " << obs.y << ")" << endl;
-//			cout << "landmark (" << predicted[obs.id].x << ", " << predicted[obs.id].y << endl;
-//			cout << "distance: " << distance << endl;
-//			cout << "------------------------" << endl;
 			double diffX = association.x - obs.x;
 			double diffY = association.y - obs.y;
 			double p1 = (diffX * diffX) / (2 * sig_landmark_x * sig_landmark_x);
@@ -191,21 +196,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 			double weight = exp(-(p1 + p2)) / (2 * M_PI * sig_landmark_x * sig_landmark_y);
 			p.weight *= weight;
+
+//			cout << "Landmark " << association.id << ": (" << association.x << ", " << association.y << ") - "
+//					<< "Particle (" << p.x << ", " << p.y << ")" << endl;
+//			cout << "dx: " << diffX << ", dy: " << diffY << endl;
+//			cout << "Weight: " << weight << endl;
+//			cout << "Accumulated Weight: " << p.weight << endl;
 		}
 
 //		SetAssociations(particles[i], associations, senseX, senseY);
 		p.associations = associations;
 		p.sense_x = senseX;
 		p.sense_y = senseY;
-
-		cout << "association size: " << p.associations.size() << endl;
-		cout << "association: ";
-		for (int assoc : p.associations) {
-			cout << assoc << " ";
-		}
-		cout << endl;
 		weights.push_back(p.weight);
-//		cout << "particle's weight: " << p.weight << endl;
 	}
 }
 
