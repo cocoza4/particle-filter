@@ -204,10 +204,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 //			cout << "Accumulated Weight: " << p.weight << endl;
 		}
 
-//		SetAssociations(particles[i], associations, senseX, senseY);
-		p.associations = associations;
-		p.sense_x = senseX;
-		p.sense_y = senseY;
+		SetAssociations(p, associations, senseX, senseY);
+//		p.associations = associations;
+//		p.sense_x = senseX;
+//		p.sense_y = senseY;
 		weights.push_back(p.weight);
 	}
 }
