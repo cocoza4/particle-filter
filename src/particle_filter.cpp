@@ -138,7 +138,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		vector<LandmarkObs> obsMapList;
-		for (const auto& obs : observations) {
+		for (const auto& obs: observations) {
 			double glob_obs_x = obs.x*cos(p.theta) - obs.y*sin(p.theta) + p.x;
 			double glob_obs_y = obs.x*sin(p.theta) + obs.y*cos(p.theta) + p.y;
 
@@ -146,19 +146,18 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			obsMap.id = -1;
 			obsMap.x = glob_obs_x;
 			obsMap.y = glob_obs_y;
-			obsMapList.push_back(obsMap);
-		}
 
-		for (auto& obs : obsMapList) {
 			double minDist = std::numeric_limits<float>::max();
 			for (const auto &it: landmarksInRange) {
 				auto &pred = it.second;
-				double distance = dist(obs.x, obs.y, pred.x, pred.y);
+				double distance = dist(obsMap.x, obsMap.y, pred.x, pred.y);
 				if (distance < minDist) {
 					minDist = distance;
-					obs.id = pred.id;
+					obsMap.id = pred.id;
 				}
 			}
+
+			obsMapList.push_back(obsMap);
 		}
 
 		vector<int> associations;
